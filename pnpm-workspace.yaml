@@ -1,0 +1,8 @@
+packages:
+  - web
+
+allowBuilds:
+  esbuild: true
+minimumReleaseAgeExclude:
+  - '@nomicfoundation/hardhat-utils@4.1.6'
+  - hardhat@3.11.1
