@@ -23,6 +23,8 @@ interface IOddsIndexOracle {
         uint32 maxAge;
         uint32 twapWindow;
         uint8 minSources;
+        uint16 maxDeviationBps;
+        uint32 deviationWindow;
         uint64 resolvedAt;
         uint32 finalPrice;
     }

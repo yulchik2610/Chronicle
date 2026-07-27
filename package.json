@@ -11,6 +11,8 @@
     "node": "hardhat node",
     "deploy:local": "hardhat ignition deploy ignition/modules/Chronicle.ts --network localhost --deployment-id chronicle-local",
     "deploy:arc": "hardhat ignition deploy ignition/modules/ChronicleArc.ts --network arcTestnet --deployment-id chronicle-arc",
+    "setup:arc-demo": "hardhat run scripts/arc-demo-setup.ts --network arcTestnet",
+    "settle:arc-demo": "hardhat run scripts/arc-demo-settle.ts --network arcTestnet",
     "smoke:local": "hardhat run scripts/local-smoke.ts --network localhost",
     "web:dev": "pnpm --dir web dev",
     "web:build": "pnpm --dir web build",

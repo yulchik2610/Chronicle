@@ -11,6 +11,7 @@ import {IOddsIndexOracle} from "./interfaces/IOddsIndexOracle.sol";
 /// @dev Prices use six-decimal probability precision: 1_000_000 == 100%.
 contract OddsIndexOracle is IOddsIndexOracle, AccessControlDefaultAdminRules {
     uint32 public constant PRICE_SCALE = 1_000_000;
+    uint16 public constant BPS = 10_000;
 
     bytes32 public constant PUBLISHER_ROLE = keccak256("PUBLISHER_ROLE");
     bytes32 public constant RESOLVER_ROLE = keccak256("RESOLVER_ROLE");
@@ -40,12 +41,20 @@ contract OddsIndexOracle is IOddsIndexOracle, AccessControlDefaultAdminRules {
     error ExpiryNotReached(uint64 expiry);
     error SettlementAlreadyFinalized(bytes32 marketId, uint64 expiry);
     error InvalidResolutionPrice(uint32 price);
+    error DeviationExceeded(
+        uint32 previousPrice,
+        uint32 newPrice,
+        uint256 deviationBps,
+        uint16 maximumDeviationBps
+    );
 
     event MarketRegistered(
         bytes32 indexed marketId,
         uint32 maxAge,
         uint32 twapWindow,
-        uint8 minSources
+        uint8 minSources,
+        uint16 maxDeviationBps,
+        uint32 deviationWindow
     );
     event IndexUpdated(
         bytes32 indexed marketId,
@@ -53,6 +62,13 @@ contract OddsIndexOracle is IOddsIndexOracle, AccessControlDefaultAdminRules {
         uint64 timestamp,
         uint8 sourceCount,
         bytes32 indexed sourcesHash
+    );
+    event IndexDeviationOverride(
+        bytes32 indexed marketId,
+        uint32 previousPrice,
+        uint32 newPrice,
+        uint64 timestamp,
+        bytes32 indexed reasonHash
     );
     event MarketDisputeFlagged(bytes32 indexed marketId, bytes32 indexed reasonHash);
     event MarketDisputeCleared(bytes32 indexed marketId);
@@ -93,10 +109,16 @@ contract OddsIndexOracle is IOddsIndexOracle, AccessControlDefaultAdminRules {
         bytes32 marketId,
         uint32 maxAge,
         uint32 twapWindow,
-        uint8 minSources
+        uint8 minSources,
+        uint16 maxDeviationBps,
+        uint32 deviationWindow
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (marketId == bytes32(0)) revert InvalidMarketId();
-        if (maxAge == 0 || twapWindow == 0 || minSources == 0) {
+        if (
+            maxAge == 0 || twapWindow == 0 || minSources == 0
+                || maxDeviationBps == 0 || maxDeviationBps > BPS
+                || deviationWindow == 0
+        ) {
             revert InvalidConfiguration();
         }
         if (_marketConfigs[marketId].status != MarketStatus.Unregistered) {
@@ -108,11 +130,20 @@ contract OddsIndexOracle is IOddsIndexOracle, AccessControlDefaultAdminRules {
             maxAge: maxAge,
             twapWindow: twapWindow,
             minSources: minSources,
+            maxDeviationBps: maxDeviationBps,
+            deviationWindow: deviationWindow,
             resolvedAt: 0,
             finalPrice: 0
         });
 
-        emit MarketRegistered(marketId, maxAge, twapWindow, minSources);
+        emit MarketRegistered(
+            marketId,
+            maxAge,
+            twapWindow,
+            minSources,
+            maxDeviationBps,
+            deviationWindow
+        );
     }
 
     /// @notice Appends a publisher-computed multi-source index observation.
@@ -124,6 +155,42 @@ contract OddsIndexOracle is IOddsIndexOracle, AccessControlDefaultAdminRules {
         uint8 sourceCount,
         bytes32 sourcesHash
     ) external onlyRole(PUBLISHER_ROLE) {
+        _updateIndex(marketId, price, timestamp, sourceCount, sourcesHash, false);
+    }
+
+    /// @notice Allows a guardian multisig to confirm an otherwise blocked price jump.
+    /// @dev The reason commitment should reference the reviewed source evidence.
+    function updateIndexWithDeviationOverride(
+        bytes32 marketId,
+        uint32 price,
+        uint64 timestamp,
+        uint8 sourceCount,
+        bytes32 sourcesHash,
+        bytes32 reasonHash
+    ) external onlyRole(GUARDIAN_ROLE) {
+        if (reasonHash == bytes32(0)) revert InvalidSourceCommitment();
+        Observation[] storage observations = _observations[marketId];
+        uint32 previousPrice =
+            observations.length == 0 ? price : observations[observations.length - 1].price;
+
+        _updateIndex(marketId, price, timestamp, sourceCount, sourcesHash, true);
+        emit IndexDeviationOverride(
+            marketId,
+            previousPrice,
+            price,
+            timestamp,
+            reasonHash
+        );
+    }
+
+    function _updateIndex(
+        bytes32 marketId,
+        uint32 price,
+        uint64 timestamp,
+        uint8 sourceCount,
+        bytes32 sourcesHash,
+        bool bypassDeviation
+    ) private {
         MarketConfig storage config = _requireRegistered(marketId);
         if (config.status != MarketStatus.Active) {
             revert MarketNotActive(marketId, config.status);
@@ -134,6 +201,22 @@ contract OddsIndexOracle is IOddsIndexOracle, AccessControlDefaultAdminRules {
             revert InsufficientSources(sourceCount, config.minSources);
         }
         if (sourcesHash == bytes32(0)) revert InvalidSourceCommitment();
+
+        Observation[] storage observations = _observations[marketId];
+        if (!bypassDeviation && observations.length != 0) {
+            Observation storage previous = observations[observations.length - 1];
+            if (timestamp <= uint256(previous.timestamp) + config.deviationWindow) {
+                uint256 deviationBps = _deviationBps(previous.price, price);
+                if (deviationBps > config.maxDeviationBps) {
+                    revert DeviationExceeded(
+                        previous.price,
+                        price,
+                        deviationBps,
+                        config.maxDeviationBps
+                    );
+                }
+            }
+        }
 
         _appendObservation(marketId, price, timestamp);
         emit IndexUpdated(marketId, price, timestamp, sourceCount, sourcesHash);
@@ -309,6 +392,20 @@ contract OddsIndexOracle is IOddsIndexOracle, AccessControlDefaultAdminRules {
                 cumulativePrice: cumulativePrice
             })
         );
+    }
+
+    function _deviationBps(uint32 previousPrice, uint32 newPrice)
+        private
+        pure
+        returns (uint256)
+    {
+        if (previousPrice == newPrice) return 0;
+        if (previousPrice == 0) return type(uint256).max;
+
+        uint256 difference = previousPrice > newPrice
+            ? uint256(previousPrice - newPrice)
+            : uint256(newPrice - previousPrice);
+        return (difference * BPS) / previousPrice;
     }
 
     function _getTwap(

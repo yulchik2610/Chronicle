@@ -43,6 +43,8 @@ contract BinaryOption is
     bytes32 public constant SERIES_MANAGER_ROLE = keccak256("SERIES_MANAGER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     uint32 public constant PRICE_SCALE = 1_000_000;
+    uint16 public constant BPS = 10_000;
+    uint16 public constant MAX_DIRECTIONAL_SURCHARGE_BPS = 5_000;
 
     IERC20 public immutable collateral;
     IOddsIndexOracle public immutable oracle;
@@ -56,6 +58,7 @@ contract BinaryOption is
     error InvalidStrike(uint32 strike);
     error InvalidExpiry(uint64 expiry);
     error InvalidPremium(uint256 premium);
+    error InvalidPremiumPair(uint256 combinedPremium, uint256 payout);
     error InvalidAmount();
     error SeriesNotFound(uint64 seriesId);
     error SeriesExpired(uint64 seriesId);
@@ -66,6 +69,7 @@ contract BinaryOption is
     error SlippageExceeded(uint256 premium, uint256 maximumPremium);
     error AmountOverflow();
     error MarketUnavailable(bytes32 marketId, IOddsIndexOracle.MarketStatus status);
+    error MarketIndexStale(bytes32 marketId, uint64 lastUpdate);
 
     event SeriesCreated(
         uint64 indexed seriesId,
@@ -148,6 +152,10 @@ contract BinaryOption is
                     : belowPremium
             );
         }
+        uint256 combinedPremium = uint256(abovePremium) + uint256(belowPremium);
+        if (combinedPremium < payoutPerContract) {
+            revert InvalidPremiumPair(combinedPremium, payoutPerContract);
+        }
 
         IOddsIndexOracle.MarketConfig memory config = oracle.marketConfig(marketId);
         if (config.status != IOddsIndexOracle.MarketStatus.Active) {
@@ -189,9 +197,16 @@ contract BinaryOption is
         if (block.timestamp >= optionSeries.expiry) revert SeriesExpired(seriesId);
         if (optionSeries.settled) revert SeriesAlreadySettled(seriesId);
 
-        uint256 unitPremium =
-            side == Side.Above ? optionSeries.abovePremium : optionSeries.belowPremium;
-        premium = unitPremium * amount;
+        IOddsIndexOracle.IndexData memory index =
+            oracle.getLatestIndex(optionSeries.marketId);
+        if (index.status != IOddsIndexOracle.MarketStatus.Active) {
+            revert MarketUnavailable(optionSeries.marketId, index.status);
+        }
+        if (index.isStale) {
+            revert MarketIndexStale(optionSeries.marketId, index.timestamp);
+        }
+
+        premium = _premiumFor(optionSeries, side, amount);
         if (premium > maximumPremium) {
             revert SlippageExceeded(premium, maximumPremium);
         }
@@ -276,9 +291,10 @@ contract BinaryOption is
         returns (uint256 premium, uint256 maximumPayout)
     {
         Series storage optionSeries = _requireSeries(seriesId);
-        uint256 unitPremium =
-            side == Side.Above ? optionSeries.abovePremium : optionSeries.belowPremium;
-        return (unitPremium * amount, payoutPerContract * amount);
+        return (
+            _premiumFor(optionSeries, side, amount),
+            payoutPerContract * amount
+        );
     }
 
     function series(uint64 seriesId) external view returns (Series memory) {
@@ -313,5 +329,46 @@ contract BinaryOption is
     {
         optionSeries = _series[seriesId];
         if (optionSeries.marketId == bytes32(0)) revert SeriesNotFound(seriesId);
+    }
+
+    /// @dev Base premiums are risk-manager quotes. The deterministic surcharge
+    ///      prices the net directional exposure created by this order.
+    function _premiumFor(Series storage optionSeries, Side side, uint128 amount)
+        private
+        view
+        returns (uint256)
+    {
+        uint256 aboveAfter = uint256(optionSeries.totalAbove);
+        uint256 belowAfter = uint256(optionSeries.totalBelow);
+        if (side == Side.Above) {
+            aboveAfter += amount;
+        } else {
+            belowAfter += amount;
+        }
+
+        uint256 directionalContracts;
+        if (side == Side.Above && aboveAfter > belowAfter) {
+            directionalContracts = aboveAfter - belowAfter;
+        } else if (side == Side.Below && belowAfter > aboveAfter) {
+            directionalContracts = belowAfter - aboveAfter;
+        }
+
+        uint256 assets = pool.totalAssets();
+        uint256 surchargeBps = assets == 0
+            ? MAX_DIRECTIONAL_SURCHARGE_BPS
+            : (directionalContracts * payoutPerContract * BPS) / assets;
+        if (surchargeBps > MAX_DIRECTIONAL_SURCHARGE_BPS) {
+            surchargeBps = MAX_DIRECTIONAL_SURCHARGE_BPS;
+        }
+
+        uint256 baseUnitPremium =
+            side == Side.Above ? optionSeries.abovePremium : optionSeries.belowPremium;
+        uint256 effectiveUnitPremium =
+            (baseUnitPremium * (BPS + surchargeBps)) / BPS;
+        if (effectiveUnitPremium >= payoutPerContract) {
+            effectiveUnitPremium = payoutPerContract - 1;
+        }
+
+        return effectiveUnitPremium * amount;
     }
 }

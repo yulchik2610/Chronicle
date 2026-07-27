@@ -1,29 +1,21 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 import { id } from "ethers";
 
-// Arc testnet deployment module.
-//
-// Unlike the local module (ignition/modules/Chronicle.ts), a testnet deployer
-// usually has a SINGLE funded key, so every privileged role (admin, publisher,
-// resolver, guardian) and the seed LP/trader all resolve to account(0). Adjust
-// the role accounts below if you fund additional signers.
-//
-// USDC is deployed as MockUSDC (test collateral), matching the local flow.
-
 const MARKET_ID = id("market:election-district-n-2026");
 const USDC = 1_000_000n;
+const ARC_USDC = "0x3600000000000000000000000000000000000000";
 
 export default buildModule("ChronicleArcModule", (m) => {
-  // Single-signer testnet deploy: all roles collapse onto the deployer.
+  // A single signer keeps the hackathon demo operable. Production deployments
+  // must replace these roles with separate multisig-controlled addresses.
   const deployer = m.getAccount(0);
   const admin = deployer;
   const publisher = deployer;
   const resolver = deployer;
   const guardian = deployer;
   const lp = deployer;
-  const trader = deployer;
 
-  const mockUsdc = m.contract("MockUSDC");
+  const usdc = m.contractAt("IERC20", ARC_USDC, { id: "ArcUSDC" });
   const oracle = m.contract("OddsIndexOracle", [
     admin,
     publisher,
@@ -31,9 +23,9 @@ export default buildModule("ChronicleArcModule", (m) => {
     guardian,
     0
   ]);
-  const pool = m.contract("OptionPool", [mockUsdc, admin, 9_000, 0]);
+  const pool = m.contract("OptionPool", [usdc, admin, 10_000, 0]);
   const option = m.contract("BinaryOption", [
-    mockUsdc,
+    usdc,
     oracle,
     pool,
     admin,
@@ -49,45 +41,30 @@ export default buildModule("ChronicleArcModule", (m) => {
   const registerDemoMarket = m.call(
     oracle,
     "registerMarket",
-    [MARKET_ID, 300, 100, 2],
+    [MARKET_ID, 300, 100, 2, 6_000, 60],
     {
       from: admin,
       id: "register_demo_market"
     }
   );
 
-  // Seed liquidity so the market is tradeable immediately after deploy.
-  const mintLiquidity = m.call(mockUsdc, "mint", [lp, 2_000n * USDC], {
-    from: admin,
-    id: "mint_lp_liquidity"
-  });
+  // Arc exposes testnet USDC at a canonical address. The deployer must receive
+  // faucet USDC before running this module.
+  const seedLiquidity = m.getParameter("seedLiquidity", 5n * USDC);
   const approvePoolLiquidity = m.call(
-    mockUsdc,
+    usdc,
     "approve",
-    [pool, 1_000n * USDC],
+    [pool, seedLiquidity],
     {
       from: lp,
-      id: "approve_pool_liquidity",
-      after: [mintLiquidity]
+      id: "approve_pool_liquidity"
     }
   );
-  m.call(pool, "deposit", [1_000n * USDC, lp], {
+  m.call(pool, "deposit", [seedLiquidity, lp], {
     from: lp,
     id: "seed_option_pool",
     after: [approvePoolLiquidity]
   });
 
-  const expiry = m.getParameter("expiry", 1_893_456_000);
-  m.call(
-    option,
-    "createSeries",
-    [MARKET_ID, 650_000, expiry, 350_000, 650_000],
-    {
-      from: admin,
-      id: "create_demo_series",
-      after: [authorizeOptionContract, registerDemoMarket]
-    }
-  );
-
-  return { mockUsdc, oracle, pool, option };
+  return { usdc, oracle, pool, option };
 });

@@ -20,7 +20,7 @@ export default buildModule("ChronicleModule", (m) => {
     guardian,
     0
   ]);
-  const pool = m.contract("OptionPool", [mockUsdc, admin, 9_000, 0]);
+  const pool = m.contract("OptionPool", [mockUsdc, admin, 10_000, 0]);
   const option = m.contract("BinaryOption", [
     mockUsdc,
     oracle,
@@ -38,7 +38,7 @@ export default buildModule("ChronicleModule", (m) => {
   const registerDemoMarket = m.call(
     oracle,
     "registerMarket",
-    [MARKET_ID, 300, 100, 2],
+    [MARKET_ID, 300, 100, 2, 6_000, 60],
     {
     from: admin,
       id: "register_demo_market"

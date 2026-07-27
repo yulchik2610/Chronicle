@@ -1,28 +1,102 @@
-# Chronicle Odds Derivatives
+# Chronicle Protocol
 
-Рабочий прототип on-chain рынка опционов на вероятность событий:
+**Trade the odds as the story unfolds.**
 
-- `OddsIndexOracle.sol` — append-only индекс вероятности, TWAP и финализация;
-- `OptionPool.sol` — ERC-4626 пул андеррайтинга с лимитом утилизации;
-- `BinaryOption.sol` — ERC-1155 позиции ABOVE/BELOW, покупка и claim;
-- React-интерфейс — подключение кошелька, approve USDC, ставка, позиции и claim.
+Chronicle is an on-chain derivatives protocol for trading the path of event
+probabilities, not only the final event outcome. A trader buys an ERC-1155
+`ABOVE` or `BELOW` position on whether a curated probability index will finish
+above a strike at expiry. Every position has a fixed maximum loss, a known
+maximum payout, and USDC collateral reserved when the trade is opened.
 
-Все вероятности имеют точность 6 знаков:
+The repository contains a working MVP for Arc Testnet and a fully reproducible
+local demo. It is unaudited and must not be used with production funds.
 
-- `0` = 0%;
-- `500_000` = 50%;
-- `1_000_000` = 100%.
+## Architecture
 
-## Локальный запуск
+- `OddsIndexOracle.sol` — append-only probability observations, per-market
+  heartbeat and TWAP settings, dispute/resolution states, deviation protection,
+  and permissionless settlement snapshots.
+- `OptionPool.sol` — ERC-4626 USDC vault that reserves the full payout
+  obligation before a position is minted and prevents LP withdrawals from
+  consuming reserved collateral.
+- `BinaryOption.sol` — ERC-1155 `ABOVE`/`BELOW` positions, utilization-aware
+  quotes, slippage protection, settlement, and claims.
+- `web/` — React/Vite interface with wallet connection, live Polymarket context,
+  on-chain quotes, trade execution, position tracking, and claims.
 
-Нужны Node.js и pnpm.
+Probability values use six-decimal precision:
+
+- `0` = 0%
+- `500_000` = 50%
+- `1_000_000` = 100%
+
+## Trade lifecycle
+
+1. A risk manager creates a series with a market, strike, expiry, and base
+   premiums.
+2. The interface requests the current on-chain quote and applies a 1% maximum
+   slippage bound.
+3. The trader approves USDC and buys `ABOVE` or `BELOW`.
+4. The premium enters the pool and the full maximum payout is reserved.
+5. Chronicle mints the ERC-1155 position.
+6. After expiry, anyone can finalize the market TWAP and settle the series.
+7. Winning positions are burned in exchange for their reserved USDC payout.
+
+## Premium and solvency model
+
+The MVP separates market risk pricing from inventory pricing.
+
+The series manager supplies a base premium per side. The paired base premiums
+must satisfy:
+
+```text
+baseAbove + baseBelow >= payoutPerContract
+```
+
+This prevents a trader from buying both sides below the guaranteed payout.
+Production base premiums are intended to come from an implied-volatility model
+for the probability index, calibrated with historical TWAP volatility from
+comparable markets.
+
+For each order, the contract then calculates the directional exposure after the
+trade:
+
+```text
+directionalContracts = max(contractsOnChosenSide - contractsOnOtherSide, 0)
+directionalUtilization = directionalContracts * payout / poolAssets
+surcharge = min(directionalUtilization, 50%)
+effectivePremium = min(basePremium * (1 + surcharge), payout - 1 unit)
+```
+
+The result makes increasingly one-sided inventory progressively more expensive.
+The pool deployment uses a 100% utilization ceiling as a hard solvency boundary,
+not as the primary pricing mechanism.
+
+## Oracle safety
+
+Each market has its own heartbeat (`maxAge`), TWAP window, minimum source count,
+maximum short-window deviation, and deviation window.
+
+- New trades fail when the index is stale, disputed, or already resolved.
+- A price move above the configured relative deviation is rejected when it
+  occurs inside the configured window.
+- A guardian-controlled multisig can publish the reviewed point through the
+  explicit deviation-override path, with a reason commitment recorded on-chain.
+- Settlement uses the market-specific TWAP instead of a single global window.
+- Publisher, guardian, resolver, series-manager, and admin permissions are
+  distinct roles. The hackathon deployment may temporarily use one funded
+  operator; production must assign independent multisig-controlled accounts.
+
+## Local MVP
+
+Requirements: Node.js 22 and pnpm 11.
 
 ```bash
 pnpm install
 pnpm node
 ```
 
-Во втором терминале:
+In a second terminal:
 
 ```bash
 pnpm deploy:local
@@ -30,79 +104,66 @@ pnpm smoke:local
 pnpm web:dev
 ```
 
-После деплоя адреса находятся в
-`ignition/deployments/chronicle-local/deployed_addresses.json`. Для локального
-интерфейса они уже записаны в игнорируемый Git-файл `web/.env`.
+Open `http://127.0.0.1:5173`. The smoke scenario validates the complete flow:
+fresh oracle observation, dynamic quote, approval, purchase, collateral reserve,
+TWAP finalization, permissionless settlement, winning claim, position burn, and
+reserve release.
 
-Откройте `http://127.0.0.1:4173`. Для ручной сделки добавьте сеть
-`http://127.0.0.1:8545`, chain ID `31337`, в браузерный кошелёк и импортируйте
-один из тестовых аккаунтов, которые показывает `pnpm node`.
-
-## Проверка
+Run the full automated gate with:
 
 ```bash
 pnpm check
 ```
 
-Команда запускает Solidity-тесты, TypeScript-проверку и production-сборку
-интерфейса.
+## Arc Testnet
 
-## Модель исполнения
+Chronicle uses the official Arc Testnet configuration:
 
-1. Risk Manager создаёт серию со страйком, экспирацией и премиями.
-2. Трейдер разрешает списание USDC и покупает ABOVE или BELOW.
-3. Премия поступает в пул, а максимальная выплата резервируется.
-4. Трейдер получает ERC-1155 позицию.
-5. После финализации oracle любой keeper рассчитывает серию.
-6. Победитель сжигает позицию и получает выплату из пула.
+- Chain ID: `5042002`
+- RPC: `https://rpc.testnet.arc.network`
+- Explorer: `https://testnet.arcscan.app`
+- USDC ERC-20 interface: `0x3600000000000000000000000000000000000000`
 
-## Безопасность
-
-Код предназначен для разработки и тестовых сетей. Он не проходил независимый
-аудит и не должен использоваться с реальными средствами до аудита, настройки
-production-oracle, multisig-ролей, мониторинга и ограничений риска.
-
-
-## Деплой в Circle Arc testnet
-
-Сеть `arcTestnet` в `hardhat.config.ts` не содержит захардкоженных параметров.
-RPC-эндпоинт и приватный ключ деплоера читаются лениво (только при
-использовании сети) через `configVariable`, а chainId определяется из RPC.
-
-Задайте два секрета (не коммитятся в Git):
+Fund the deployer with Arc Testnet USDC, then store the private key in the
+encrypted Hardhat keystore:
 
 ```bash
-npx hardhat keystore set ARC_RPC_URL       # JSON-RPC Arc testnet
-npx hardhat keystore set ARC_PRIVATE_KEY   # ключ деплоера, 0x..., пополнен на Arc
-```
-
-Либо экспортируйте те же переменные в окружении (см. `.env.example`).
-
-USDC на Arc разворачивается как `MockUSDC` (тестовый коллатерал), как и локально.
-Деплой одним подписантом — все роли (admin/publisher/resolver/guardian) и
-seed LP/trader сходятся на `account(0)`:
-
-```bash
+npx hardhat keystore set ARC_PRIVATE_KEY
 pnpm deploy:arc
+pnpm setup:arc-demo
 ```
 
-Адреса появятся в
-`ignition/deployments/chronicle-arc/deployed_addresses.json`.
+The deployment seeds 5 USDC by default. Override it through the
+`ChronicleArcModule.seedLiquidity` Ignition parameter when needed.
 
-### Подключение интерфейса к Arc
-
-Скопируйте шаблон и подставьте адреса из деплоя и параметры сети Arc:
+After the short demo series expires:
 
 ```bash
-cp web/.env.arc.example web/.env
+pnpm settle:arc-demo
 ```
 
-Заполните `VITE_CHAIN_ID`, `VITE_RPC_URL`, `VITE_CHAIN_NAME` (из документации Arc)
-и четыре `VITE_*_ADDRESS` (из `deployed_addresses.json`), затем:
+Copy `web/.env.arc.example` to `web/.env`, insert the deployed oracle, pool, and
+option addresses from
+`ignition/deployments/chronicle-arc/deployed_addresses.json`, and build:
 
 ```bash
-pnpm web:dev
+pnpm web:build
 ```
 
-Добавьте ту же сеть Arc и её chain ID в браузерный кошелёк, чтобы совершать
-сделки: подключение → approve USDC → ставка ABOVE/BELOW → позиции → claim.
+## Deployment and judging checklist
+
+- Public source repository
+- Passing `pnpm check`
+- Arc Testnet contract addresses and ArcScan links
+- Public frontend URL with `/app` rewrite support
+- Public demo video
+- Public presentation
+- Clear `NOT AUDITED` disclosure
+
+## Regulatory and product scope
+
+Chronicle is presented as an experimental derivatives protocol, not a
+prediction-market operator. A public launch still requires jurisdiction-specific
+legal review, geographic restrictions where required, frontend eligibility/KYC
+decisions, sanctions controls, risk disclosures, and independent smart-contract
+and oracle audits.

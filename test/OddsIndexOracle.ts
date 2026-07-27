@@ -13,6 +13,8 @@ const PRICE_SCALE = 1_000_000;
 const MAX_AGE = 300;
 const TWAP_WINDOW = 100;
 const MIN_SOURCES = 2;
+const MAX_DEVIATION_BPS = 6_000;
+const DEVIATION_WINDOW = 60;
 
 describe("OddsIndexOracle", function () {
   async function deployFixture() {
@@ -30,7 +32,14 @@ describe("OddsIndexOracle", function () {
 
     await oracle
       .connect(admin)
-      .registerMarket(MARKET_ID, MAX_AGE, TWAP_WINDOW, MIN_SOURCES);
+      .registerMarket(
+        MARKET_ID,
+        MAX_AGE,
+        TWAP_WINDOW,
+        MIN_SOURCES,
+        MAX_DEVIATION_BPS,
+        DEVIATION_WINDOW
+      );
 
     const baseTime = (await networkHelpers.time.latest()) + 1_000;
 
@@ -68,6 +77,8 @@ describe("OddsIndexOracle", function () {
     expect(config.maxAge).to.equal(BigInt(MAX_AGE));
     expect(config.twapWindow).to.equal(BigInt(TWAP_WINDOW));
     expect(config.minSources).to.equal(BigInt(MIN_SOURCES));
+    expect(config.maxDeviationBps).to.equal(BigInt(MAX_DEVIATION_BPS));
+    expect(config.deviationWindow).to.equal(BigInt(DEVIATION_WINDOW));
 
     expect(
       await oracle.hasRole(await oracle.DEFAULT_ADMIN_ROLE(), admin.address)
@@ -90,7 +101,14 @@ describe("OddsIndexOracle", function () {
     await expect(
       oracle
         .connect(outsider)
-        .registerMarket(ethers.id("another-market"), 300, 60, 2)
+        .registerMarket(
+          ethers.id("another-market"),
+          300,
+          60,
+          2,
+          MAX_DEVIATION_BPS,
+          DEVIATION_WINDOW
+        )
     ).to.be.revertedWithCustomError(
       oracle,
       "AccessControlUnauthorizedAccount"
@@ -183,6 +201,45 @@ describe("OddsIndexOracle", function () {
           SOURCE_HASH
         )
     ).to.be.revertedWithCustomError(oracle, "InvalidTimestamp");
+  });
+
+  it("blocks abnormal short-window moves until the guardian confirms them", async function () {
+    const { oracle, publisher, guardian, baseTime, publish } =
+      await networkHelpers.loadFixture(deployFixture);
+
+    await publish(baseTime, 400_000);
+    const jumpTimestamp = baseTime + 30;
+    await networkHelpers.time.setNextBlockTimestamp(jumpTimestamp);
+
+    await expect(
+      oracle
+        .connect(publisher)
+        .updateIndex(
+          MARKET_ID,
+          700_000,
+          jumpTimestamp,
+          MIN_SOURCES,
+          SOURCE_HASH
+        )
+    )
+      .to.be.revertedWithCustomError(oracle, "DeviationExceeded")
+      .withArgs(400_000, 700_000, 7_500, MAX_DEVIATION_BPS);
+
+    const reasonHash = ethers.id("guardian-reviewed-polymarket-spike");
+    await expect(
+      oracle
+        .connect(guardian)
+        .updateIndexWithDeviationOverride(
+          MARKET_ID,
+          700_000,
+          jumpTimestamp,
+          MIN_SOURCES,
+          SOURCE_HASH,
+          reasonHash
+        )
+    )
+      .to.emit(oracle, "IndexDeviationOverride")
+      .withArgs(MARKET_ID, 400_000, 700_000, jumpTimestamp, reasonHash);
   });
 
   it("computes historical TWAPs with boundary interpolation", async function () {

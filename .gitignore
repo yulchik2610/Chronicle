@@ -10,3 +10,7 @@ typechain-types/
 *.bak
 .claude/
 ignition/deployments/
+
+# Keep only the production hero artwork in the public repository.
+web/public/assets/*
+!web/public/assets/call_rO5VaowuRxQJ39g98IFQI99m.png
