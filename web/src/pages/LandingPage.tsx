@@ -20,6 +20,17 @@ import {
   WalletControl
 } from "../components";
 
+const HERO_STORY_LAYERS = [
+  { name: "gulf", src: "/assets/hero-layers/gulf.webp" },
+  { name: "world-cup", src: "/assets/hero-layers/world-cup.webp" },
+  { name: "fed", src: "/assets/hero-layers/fed.webp" },
+  { name: "rockets", src: "/assets/hero-layers/rockets.webp" },
+  { name: "satoshi", src: "/assets/hero-layers/satoshi.webp" },
+  { name: "trump", src: "/assets/hero-layers/trump.webp" },
+  { name: "maduro", src: "/assets/hero-layers/maduro.webp" },
+  { name: "robot", src: "/assets/hero-layers/robot.webp" }
+] as const;
+
 export function LandingPage() {
   const poolReads = useReadContracts({
     contracts: [
@@ -68,6 +79,17 @@ export function LandingPage() {
           decoding="async"
           fetchPriority="high"
         />
+        <div className="hero-story" role="presentation">
+          {HERO_STORY_LAYERS.map((layer) => (
+            <img
+              key={layer.name}
+              className={`hero-story-layer hero-story-${layer.name}`}
+              src={layer.src}
+              alt=""
+              decoding="async"
+            />
+          ))}
+        </div>
         <div className="hero-gradient" />
       </div>
       <header className="site-header">
