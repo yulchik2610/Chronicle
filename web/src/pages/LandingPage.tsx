@@ -21,7 +21,7 @@ import {
 } from "../components";
 
 const HERO_PANORAMA =
-  "/hero/exec-38a9eaf3-457f-4a7e-a833-2034baeefcde.png";
+  "/hero/exec-71b9a0c2-ab23-43cd-84b5-9634daf7e26c.png";
 
 export function LandingPage() {
   const poolReads = useReadContracts({
