@@ -11,7 +11,7 @@ import {
 import { useReadContracts } from "wagmi";
 import { binaryOptionAbi, poolAbi } from "../abi";
 import { chronicleChain, contracts, contractsConfigured } from "../config";
-import { HERO_MURAL, USDC, formatUsdc } from "../lib";
+import { USDC, formatUsdc } from "../lib";
 import {
   AppNotice,
   ChronicleMark,
@@ -72,13 +72,6 @@ export function LandingPage() {
   return (
     <div className="app-shell">
       <div className="hero-media" aria-hidden="true">
-        <img
-          className="hero-mural"
-          src={HERO_MURAL}
-          alt=""
-          decoding="async"
-          fetchPriority="high"
-        />
         <div className="hero-story" role="presentation">
           {HERO_STORY_LAYERS.map((layer) => (
             <img

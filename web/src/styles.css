@@ -74,20 +74,6 @@ a {
   background: #f3e5c8;
 }
 
-.hero-mural {
-  position: absolute;
-  inset: 4% auto -8% 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: center bottom;
-  opacity: 0.12;
-  filter: saturate(0.82) contrast(0.94);
-  transform: translateY(6%);
-  transform-origin: center bottom;
-  will-change: transform, opacity;
-}
-
 .hero-story {
   position: absolute;
   inset: 0;
@@ -99,7 +85,24 @@ a {
   position: absolute;
   display: block;
   height: auto;
-  mix-blend-mode: multiply;
+  filter: saturate(0.92) contrast(1.02);
+  -webkit-mask-image: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.32) 10%,
+    #000 25%,
+    #000 88%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.32) 10%,
+    #000 25%,
+    #000 88%,
+    transparent 100%
+  );
+  mix-blend-mode: normal;
   object-fit: contain;
   opacity: var(--layer-opacity, 0.62);
   transform-origin: center bottom;
@@ -111,7 +114,7 @@ a {
   bottom: 7%;
   left: -8%;
   width: 46%;
-  --layer-opacity: 0.5;
+  --layer-opacity: 0.78;
   --drift-x: 18px;
   --drift-y: -5px;
   --drift-rotate: -0.25deg;
@@ -123,7 +126,7 @@ a {
   right: -9%;
   bottom: 10%;
   width: 38%;
-  --layer-opacity: 0.5;
+  --layer-opacity: 0.78;
   --drift-x: -16px;
   --drift-y: -4px;
   --drift-rotate: 0.2deg;
@@ -135,7 +138,7 @@ a {
   bottom: 5%;
   left: 37%;
   width: 27%;
-  --layer-opacity: 0.4;
+  --layer-opacity: 0.68;
   --drift-x: 7px;
   --drift-y: -7px;
   --drift-rotate: 0deg;
@@ -147,7 +150,7 @@ a {
   bottom: 4%;
   left: -1%;
   width: 28%;
-  --layer-opacity: 0.7;
+  --layer-opacity: 0.92;
   --drift-x: 4px;
   --drift-y: -13px;
   --drift-rotate: 0.35deg;
@@ -159,7 +162,7 @@ a {
   bottom: 3%;
   left: 23%;
   width: 29%;
-  --layer-opacity: 0.58;
+  --layer-opacity: 0.9;
   --drift-x: -8px;
   --drift-y: -8px;
   --drift-rotate: -0.25deg;
@@ -171,7 +174,7 @@ a {
   bottom: 5%;
   left: 12%;
   width: 21%;
-  --layer-opacity: 0.76;
+  --layer-opacity: 0.98;
   --drift-x: 6px;
   --drift-y: -9px;
   --drift-rotate: 0.45deg;
@@ -183,7 +186,7 @@ a {
   right: 13%;
   bottom: 5%;
   width: 21%;
-  --layer-opacity: 0.76;
+  --layer-opacity: 0.98;
   --drift-x: -7px;
   --drift-y: -10px;
   --drift-rotate: -0.4deg;
@@ -195,7 +198,7 @@ a {
   right: -1%;
   bottom: 3%;
   width: 20%;
-  --layer-opacity: 0.72;
+  --layer-opacity: 0.94;
   --drift-x: -5px;
   --drift-y: -12px;
   --drift-rotate: -0.55deg;
@@ -2072,10 +2075,6 @@ footer > span:last-child {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .hero-mural {
-    animation: mural-enter 1.15s cubic-bezier(0.22, 0.8, 0.24, 1) both;
-  }
-
   .hero-story-layer {
     animation: story-drift var(--drift-duration, 18s) ease-in-out infinite alternate;
   }
@@ -2185,18 +2184,6 @@ footer > span:last-child {
   from {
     opacity: 0;
     transform: translateY(-12px);
-  }
-}
-
-@keyframes mural-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 18px, 0);
-  }
-
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -2419,67 +2406,60 @@ footer > span:last-child {
     height: 900px;
   }
 
-  .hero-mural {
-    left: -82%;
-    width: 264%;
-    object-fit: contain;
-    object-position: center bottom;
-  }
-
   .hero-story-gulf {
     bottom: 10%;
     left: -34%;
     width: 92%;
-    --layer-opacity: 0.52;
+    --layer-opacity: 0.74;
   }
 
   .hero-story-world-cup {
     right: -36%;
     bottom: 12%;
     width: 88%;
-    --layer-opacity: 0.52;
+    --layer-opacity: 0.74;
   }
 
   .hero-story-fed {
     bottom: 10%;
     left: 22%;
     width: 62%;
-    --layer-opacity: 0.38;
+    --layer-opacity: 0.62;
   }
 
   .hero-story-rockets {
     bottom: 8%;
     left: -13%;
     width: 56%;
-    --layer-opacity: 0.64;
+    --layer-opacity: 0.88;
   }
 
   .hero-story-satoshi {
     bottom: 8%;
     left: 8%;
     width: 58%;
-    --layer-opacity: 0.5;
+    --layer-opacity: 0.86;
   }
 
   .hero-story-trump {
     bottom: 9%;
     left: -3%;
     width: 39%;
-    --layer-opacity: 0.7;
+    --layer-opacity: 0.96;
   }
 
   .hero-story-maduro {
     right: 2%;
     bottom: 9%;
     width: 39%;
-    --layer-opacity: 0.7;
+    --layer-opacity: 0.96;
   }
 
   .hero-story-robot {
     right: -18%;
     bottom: 8%;
     width: 48%;
-    --layer-opacity: 0.64;
+    --layer-opacity: 0.9;
   }
 
   .hero-gradient {
