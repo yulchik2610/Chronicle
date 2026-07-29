@@ -20,7 +20,8 @@ import {
   WalletControl
 } from "../components";
 
-const HERO_PANORAMA = "/hero/chronicle-panorama.jpg";
+const HERO_PANORAMA =
+  "/hero/exec-b06eb723-a08c-42f0-ba15-c465a4666c8d.png";
 
 export function LandingPage() {
   const poolReads = useReadContracts({
