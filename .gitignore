@@ -20,3 +20,4 @@ web/public/assets/*
 # Keep the optimized hero panorama, not its local uncompressed working copy.
 web/public/hero/*.png
 !web/public/hero/exec-b06eb723-a08c-42f0-ba15-c465a4666c8d.png
+!web/public/hero/exec-38a9eaf3-457f-4a7e-a833-2034baeefcde.png
