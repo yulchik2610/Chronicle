@@ -16,3 +16,6 @@ web/public/assets/*
 !web/public/assets/call_rO5VaowuRxQJ39g98IFQI99m.png
 !web/public/assets/hero-layers/
 !web/public/assets/hero-layers/*.webp
+
+# Keep the optimized hero panorama, not its local uncompressed working copy.
+web/public/hero/*.png

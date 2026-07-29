@@ -74,143 +74,26 @@ a {
   background: #f3e5c8;
 }
 
-.hero-story {
+.hero-panorama {
   position: absolute;
-  inset: 0;
-  isolation: isolate;
-  pointer-events: none;
-}
-
-.hero-story-layer {
-  position: absolute;
+  bottom: -1%;
+  left: 50%;
   display: block;
+  width: max(1460px, 104vw);
+  max-width: none;
   height: auto;
-  filter: saturate(0.92) contrast(1.02);
-  -webkit-mask-image: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(0, 0, 0, 0.32) 10%,
-    #000 25%,
-    #000 88%,
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(0, 0, 0, 0.32) 10%,
-    #000 25%,
-    #000 88%,
-    transparent 100%
-  );
-  mix-blend-mode: normal;
-  object-fit: contain;
-  opacity: var(--layer-opacity, 0.62);
+  filter: saturate(0.94) contrast(1.01);
+  transform: translate3d(-50%, 2%, 0);
   transform-origin: center bottom;
   will-change: transform;
-}
-
-.hero-story-gulf {
-  z-index: 1;
-  bottom: 7%;
-  left: -8%;
-  width: 46%;
-  --layer-opacity: 0.78;
-  --drift-x: 18px;
-  --drift-y: -5px;
-  --drift-rotate: -0.25deg;
-  --drift-duration: 22s;
-}
-
-.hero-story-world-cup {
-  z-index: 1;
-  right: -9%;
-  bottom: 10%;
-  width: 38%;
-  --layer-opacity: 0.78;
-  --drift-x: -16px;
-  --drift-y: -4px;
-  --drift-rotate: 0.2deg;
-  --drift-duration: 19s;
-}
-
-.hero-story-fed {
-  z-index: 1;
-  bottom: 5%;
-  left: 37%;
-  width: 27%;
-  --layer-opacity: 0.68;
-  --drift-x: 7px;
-  --drift-y: -7px;
-  --drift-rotate: 0deg;
-  --drift-duration: 17s;
-}
-
-.hero-story-rockets {
-  z-index: 3;
-  bottom: 4%;
-  left: -1%;
-  width: 28%;
-  --layer-opacity: 0.92;
-  --drift-x: 4px;
-  --drift-y: -13px;
-  --drift-rotate: 0.35deg;
-  --drift-duration: 12s;
-}
-
-.hero-story-satoshi {
-  z-index: 2;
-  bottom: 3%;
-  left: 23%;
-  width: 29%;
-  --layer-opacity: 0.9;
-  --drift-x: -8px;
-  --drift-y: -8px;
-  --drift-rotate: -0.25deg;
-  --drift-duration: 16s;
-}
-
-.hero-story-trump {
-  z-index: 4;
-  bottom: 5%;
-  left: 12%;
-  width: 21%;
-  --layer-opacity: 0.98;
-  --drift-x: 6px;
-  --drift-y: -9px;
-  --drift-rotate: 0.45deg;
-  --drift-duration: 14s;
-}
-
-.hero-story-maduro {
-  z-index: 4;
-  right: 13%;
-  bottom: 5%;
-  width: 21%;
-  --layer-opacity: 0.98;
-  --drift-x: -7px;
-  --drift-y: -10px;
-  --drift-rotate: -0.4deg;
-  --drift-duration: 15s;
-}
-
-.hero-story-robot {
-  z-index: 5;
-  right: -1%;
-  bottom: 3%;
-  width: 20%;
-  --layer-opacity: 0.94;
-  --drift-x: -5px;
-  --drift-y: -12px;
-  --drift-rotate: -0.55deg;
-  --drift-duration: 13s;
 }
 
 .hero-gradient {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse at 50% 34%, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.32) 27%, rgba(255, 255, 255, 0.03) 55%, transparent 72%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.66) 0%, rgba(255, 255, 255, 0.36) 29%, rgba(255, 255, 255, 0.02) 58%, transparent 80%, var(--paper) 100%),
+    radial-gradient(ellipse at 50% 34%, rgba(255, 255, 255, 0.48) 0%, rgba(255, 255, 255, 0.18) 34%, transparent 66%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.1) 44%, transparent 75%, rgba(244, 235, 216, 0.2) 94%, var(--paper) 100%),
     linear-gradient(90deg, rgba(255, 255, 255, 0.12), transparent 50%, rgba(255, 255, 255, 0.08));
   pointer-events: none;
 }
@@ -2075,12 +1958,8 @@ footer > span:last-child {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .hero-story-layer {
-    animation: story-drift var(--drift-duration, 18s) ease-in-out infinite alternate;
-  }
-
-  .hero-story-layer:nth-child(even) {
-    animation-direction: alternate-reverse;
+  .hero-panorama {
+    animation: panorama-drift 20s ease-in-out infinite alternate;
   }
 
   .site-header > * {
@@ -2187,14 +2066,13 @@ footer > span:last-child {
   }
 }
 
-@keyframes story-drift {
+@keyframes panorama-drift {
   from {
-    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+    transform: translate3d(-50.4%, 2%, 0) scale(1.005);
   }
 
   to {
-    transform: translate3d(var(--drift-x, 8px), var(--drift-y, -8px), 0)
-      rotate(var(--drift-rotate, 0.25deg)) scale(1.015);
+    transform: translate3d(-49.6%, 0, 0) scale(1.018);
   }
 }
 
@@ -2406,60 +2284,9 @@ footer > span:last-child {
     height: 900px;
   }
 
-  .hero-story-gulf {
-    bottom: 10%;
-    left: -34%;
-    width: 92%;
-    --layer-opacity: 0.74;
-  }
-
-  .hero-story-world-cup {
-    right: -36%;
-    bottom: 12%;
-    width: 88%;
-    --layer-opacity: 0.74;
-  }
-
-  .hero-story-fed {
-    bottom: 10%;
-    left: 22%;
-    width: 62%;
-    --layer-opacity: 0.62;
-  }
-
-  .hero-story-rockets {
+  .hero-panorama {
     bottom: 8%;
-    left: -13%;
-    width: 56%;
-    --layer-opacity: 0.88;
-  }
-
-  .hero-story-satoshi {
-    bottom: 8%;
-    left: 8%;
-    width: 58%;
-    --layer-opacity: 0.86;
-  }
-
-  .hero-story-trump {
-    bottom: 9%;
-    left: -3%;
-    width: 39%;
-    --layer-opacity: 0.96;
-  }
-
-  .hero-story-maduro {
-    right: 2%;
-    bottom: 9%;
-    width: 39%;
-    --layer-opacity: 0.96;
-  }
-
-  .hero-story-robot {
-    right: -18%;
-    bottom: 8%;
-    width: 48%;
-    --layer-opacity: 0.9;
+    width: 900px;
   }
 
   .hero-gradient {
